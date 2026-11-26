@@ -1,7 +1,7 @@
 name: Fractal alertas
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "3-58/5 * * * *"
   workflow_dispatch:
 permissions:
   contents: write
@@ -21,13 +21,9 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Rodar varredura
         env:
-
-
-
-
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SYMBOLS: "BTCUSDT,ETHUSDT,XAUUSDT,XAGUSDT"
+          SYMBOLS: "BTCUSDT,ETHUSDT"
         run: python fractal_model.py --once
       - name: Salvar estado
         run: |
