@@ -52,6 +52,10 @@ def p2(x):
     return f"{x:.2f}"
 
 
+def cisd_dir(side):
+    return "BAIXA (venda)" if side == "baixa" else "ALTA (compra)"
+
+
 # ------------------------------ REDE ---------------------------------
 def http_json(url, params=None, timeout=15):
     r = requests.get(url, params=params, timeout=timeout)
@@ -108,7 +112,8 @@ def save_state(state):
 
 
 def tg_send(text):
-    tok, chat = os.getenv("TELEGRAM_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
+    tok = (os.getenv("TELEGRAM_TOKEN") or "").strip()
+    chat = (os.getenv("TELEGRAM_CHAT_ID") or "").strip()
     if not (tok and chat):
         return None  # Telegram nao configurado
     try:
@@ -208,8 +213,12 @@ def find_cisd(df, side, from_time, poi):
         broke_first = c < run_open if bear else c > run_open
         if broke_last and res["early"] is None:
             res["early"] = j
+            res["early_level"] = last_open
+            res["early_close"] = c
         if broke_first and res["confirmed"] is None:
             res["confirmed"] = j
+            res["conf_level"] = run_open
+            res["conf_close"] = c
             res["extreme"] = extreme
             break
     return res, d
@@ -538,14 +547,19 @@ def scan_symbol(sym, state):
             res, d = find_cisd(e, m["side"], m["c2_time"], m["poi"])
             if res["early"] is not None:
                 t = d.time[res["early"]]
+                lado = "abaixo" if m["side"] == "baixa" else "acima"
                 send_alert(f"{tag}:cisd_early",
-                           f"⚡ {sym} {tf}: CISD de reversao ANTECIPADO ({m['side']}) as {fmt_t(t)}", state)
+                           f"⚡ {sym} {tf}: CISD ANTECIPADO de {cisd_dir(m['side'])} - fechou "
+                           f"{p2(res['early_close'])} {lado} de {p2(res['early_level'])} "
+                           f"(abertura da ultima vela da sequencia) as {fmt_t(t)}", state)
             if res["confirmed"] is None:
                 continue
             t = d.time[res["confirmed"]]
             vies = "VENDA" if m["side"] == "baixa" else "COMPRA"
-            head = (f"✅ {sym} {tf}: CISD de reversao CONFIRMADO ({m['side']}, vies de {vies}) "
-                    f"as {fmt_t(t)}")
+            lado = "abaixo" if m["side"] == "baixa" else "acima"
+            head = (f"✅ {sym} {tf}: CISD CONFIRMADO de {cisd_dir(m['side'])} - fechou "
+                    f"{p2(res['conf_close'])} {lado} de {p2(res['conf_level'])} "
+                    f"(abertura da 1a vela da sequencia) as {fmt_t(t)}")
             send_alert(f"{tag}:cisd_conf", lambda h=head: h + "\n\n" + card("CONTEXTO"), state)
             p, lvl = find_protected_swing(d, m["side"], res["confirmed"], res["extreme"])
             if p is not None:
